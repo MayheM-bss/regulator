@@ -13,7 +13,18 @@
 #include <string.h>
 
 const float dt = 0.035;
-int reqTemp;
+float reqTemp = 0;
+unsigned char message[5];
+char num = 0;
+float temp;
+float error;
+float error0;
+float kp = 0.04;
+float tp = 0.55;
+float td = 0.625;
+float integral = 0.0000001;
+float dif;
+float u;
 
 unsigned char USARTRecevied()
 {
@@ -111,30 +122,37 @@ void USARTTransmitted(char str[])
 }
 
 
-void SetPWM()
+void SetPWM(float param)
 {
-	
+	OCR1AL = (unsigned char)param;
+	OCR1AH = (unsigned char)param >> 8;
 }
 
 ISR (TIMER0_OVF_vect)
 {
 	cli();
-	
+	reqTemp = message[0] + message[1] + message[2] + message [3] + message [4];
+	temp = ReceiveAD7705();
+	USARTTransmitted ("Температура:");
+	USARTTransmitted ((int)temp);
+	error0 = error;
+	error = reqTemp - temp;
+	integral += ((1.0/tp)*error*dt);
+	dif = td*(error-error0)/dt;
+	u = (kp*error) + integral + dif;
+	SetPWM(u);
 	sei();
 }
 
 ISR (USART0_RX_vect)
 {
 	cli();
-	unsigned char message[5];
-	for (int i = 0; i < 5; i++)
+	if (num == 4)
 	{
-		message[i] = USARTRecevied();
+		num = 0;
 	}
-	for (int i = 0; i < 5; i++)
-	{
-		reqTemp = reqTemp + message[i];
-	}
+	message[num] = USARTRecevied();
+	num++;
 	sei();
 }
 
